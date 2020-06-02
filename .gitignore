@@ -1,3 +1,7 @@
+# binaries
 bin/
 *.exe
 *.bat
+
+# contains personal debug config
+.vscode/launch.json 

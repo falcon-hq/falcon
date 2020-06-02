@@ -7,4 +7,6 @@ require (
 	github.com/maoxs2/go-socks5 v0.0.0-20200524153943-ca97b146713d
 	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37
 	golang.org/x/sys v0.0.0-20200523222454-059865788121 // indirect
+	github.com/spf13/viper v1.7.0
+	github.com/spf13/cobra v1.0.0
 )

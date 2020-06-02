@@ -5,13 +5,33 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch HK",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "args": [ "local","-r", "hk.m00n.top:18000", "-k", "123456"]
+        },
+        {
+            "name": "Launch Package",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}"
+        },
+        {
             "name": "Launch Client",
             "type": "go",
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}/cmd/client",
             "env": {},
-            "args": ["-r", "127.0.0.1:18000", "-k", "test"]
+            "args": [
+                "-r",
+                "127.0.0.1:18000",
+                "-k",
+                "test"
+            ]
         },
         {
             "name": "Launch Server",
@@ -20,7 +40,10 @@
             "mode": "debug",
             "program": "${workspaceFolder}/cmd/server",
             "env": {},
-            "args": ["-k", "test"]
+            "args": [
+                "-k",
+                "test"
+            ]
         }
     ]
 }

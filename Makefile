@@ -1,3 +1,3 @@
 gen:
-	go build -o ./bin/client ./cmd/client
-	go build -o ./bin/server ./cmd/server 
+	mkdir -p bin
+	go build -o bin/ .
