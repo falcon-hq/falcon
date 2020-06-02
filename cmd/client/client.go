@@ -71,7 +71,7 @@ func main() {
 			}
 
 			log.Println("New App Conn")
-			go handleConn(localConn, common.GetSeed(), aead)
+			go handleConn(localConn, aead)
 		}
 	}()
 
@@ -80,13 +80,13 @@ func main() {
 	}
 }
 
-func handleConn(lc net.Conn, seed []byte, aead cipher.AEAD) {
+func handleConn(lc net.Conn, aead cipher.AEAD) {
 	externalConn, err := net.Dial("tcp", *remoteAddr)
 	if err != nil {
 		log.Printf("failed connecting to remote server: %s: %s", externalConn.RemoteAddr(), err)
 	}
 
-	cryptoConn := aeadconn.NewAEADCompressConn(seed, *chunkSize, externalConn, aead)
+	cryptoConn := aeadconn.NewAEADCompressConn(common.GetSeed(), *chunkSize, externalConn, aead)
 
 	// lc -> sc
 	go func() {

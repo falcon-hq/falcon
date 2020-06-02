@@ -56,12 +56,12 @@ func main() {
 		}
 
 		log.Printf("accepted conn from %s", conn.RemoteAddr())
-		go handleConn(conn, common.GetSeed(), aead, server)
+		go handleConn(conn, aead, server)
 	}
 }
 
-func handleConn(conn net.Conn, seed []byte, aead cipher.AEAD, s5 *server) {
-	cryptoConn := aeadconn.NewAEADCompressConn(seed, *chunkSize, conn, aead)
+func handleConn(conn net.Conn, aead cipher.AEAD, s5 *server) {
+	cryptoConn := aeadconn.NewAEADCompressConn(common.GetSeed(), *chunkSize, conn, aead)
 
 	err := s5.handleConn(cryptoConn)
 	if err != nil {
