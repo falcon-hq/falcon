@@ -24,13 +24,14 @@
             "type": "go",
             "request": "launch",
             "mode": "debug",
-            "program": "${workspaceFolder}/cmd/client",
+            "program": "${workspaceFolder}",
             "env": {},
             "args": [
+                "local",
                 "-r",
                 "127.0.0.1:18000",
                 "-k",
-                "test"
+                "123456"
             ]
         },
         {
@@ -38,11 +39,12 @@
             "type": "go",
             "request": "launch",
             "mode": "debug",
-            "program": "${workspaceFolder}/cmd/server",
+            "program": "${workspaceFolder}",
             "env": {},
             "args": [
+                "remote",
                 "-k",
-                "test"
+                "123456"
             ]
         }
     ]

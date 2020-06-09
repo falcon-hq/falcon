@@ -5,33 +5,23 @@ import (
 	"log"
 	"net"
 
+	"github.com/maoxs2/falcon/clench"
 	"github.com/maoxs2/falcon/common"
 	aeadconn "github.com/maoxs2/go-aead-conn"
-	"github.com/maoxs2/go-socks5"
 )
 
 type Remote struct {
 	enableSnappy bool
-	remoteAddr   string
-	chunkSize    int
-	*s5RemoteServer
+	// remoteAddr   string
+	chunkSize int
+	*clench.Server
 }
 
 func NewRemote(chunkSize int, enableSnappy bool) *Remote {
-	conf := &socks5.Config{}
-	s5, err := socks5.New(conf)
-	if err != nil {
-		panic(err)
-	}
-
-	s5Server := &s5RemoteServer{
-		Server: s5,
-	}
-
 	return &Remote{
-		enableSnappy:   enableSnappy,
-		chunkSize:      chunkSize,
-		s5RemoteServer: s5Server,
+		enableSnappy: enableSnappy,
+		chunkSize:    chunkSize,
+		Server:       &clench.Server{},
 	}
 }
 
@@ -43,7 +33,7 @@ func (r *Remote) HandleConn(conn net.Conn, aead cipher.AEAD) {
 		cryptoConn = aeadconn.NewAEADConn(common.GetSeed(), r.chunkSize, conn, aead)
 	}
 
-	err := r.serverConn(cryptoConn)
+	err := r.Server.HandleConn(cryptoConn)
 	if err != nil {
 		log.Println(err)
 	}
