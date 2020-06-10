@@ -1,4 +1,4 @@
-package remote
+package remotecmd
 
 import (
 	"fmt"
@@ -31,8 +31,8 @@ func (s *s5RemoteServer) serverConn(conn net.Conn) error {
 
 	// Process the client request
 	if err := s.HandleRequest(request, conn); err != nil {
-		err = fmt.Errorf("Failed to handle request: %v", err)
-		s.Config.Logger.Printf("[ERR] socks: %v", err)
+		err = fmt.Errorf("failed to handle request: %v", err)
+		log.Errorf("socks error: %v", err)
 		return err
 	}
 

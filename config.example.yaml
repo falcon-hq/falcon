@@ -1,0 +1,6 @@
+serve-port: 18000 # works for remote only
+socks5-addr: "127.0.0.1:10008" # works for local only
+target-addr: "your.remote.address:18000" # works for local only
+key: "123456"
+log-level: "info"
+chunk-size: 2048

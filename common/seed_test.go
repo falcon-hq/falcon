@@ -9,17 +9,17 @@ import (
 )
 
 func TestGetSeed(t *testing.T) {
-	s1 := common.GetSeed()
+	s1 := common.GetSeed(nil)
 	time.Sleep(time.Second)
-	s2 := common.GetSeed()
+	s2 := common.GetSeed(nil)
 	if !bytes.Equal(s1, s2) {
 		t.Error("seed should be same in 1sec")
 		return
 	}
 
-	s3 := common.GetSeed()
+	s3 := common.GetSeed(nil)
 	time.Sleep(time.Minute)
-	s4 := common.GetSeed()
+	s4 := common.GetSeed(nil)
 	if bytes.Equal(s3, s4) {
 		t.Error("seed should be different beyond 1min")
 		return

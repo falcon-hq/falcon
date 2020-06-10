@@ -3,52 +3,58 @@ package remotecmd
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"flag"
 	"fmt"
-	"log"
+	logging "github.com/ipfs/go-log"
 	"net"
 
 	"github.com/maoxs2/falcon/common"
-	"github.com/maoxs2/falcon/remote"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	aeadconn "github.com/maoxs2/go-aead-conn"
+	"github.com/maoxs2/go-socks5"
 )
 
-var listenPort int
-var key string
-var chunkSize int
-var enableSnappy bool
+var log = logging.Logger("falcon-remote")
 
-var RemoteCmd = &cobra.Command{
-	Use:   "remote",
-	Short: "Server daemon for remote device",
-	Run:   run,
+type Remote struct {
+	serverPort   int
+	key          string
+	enableSnappy bool
+	remoteAddr   string
+	chunkSize    int
+	*s5RemoteServer
 }
 
-func init() {
-	RemoteCmd.Flags().IntVarP(&listenPort, "listen-port", "l", 18000, "Source directory to read from")
-	RemoteCmd.Flags().StringVarP(&key, "key", "k", "", "key for data encryption")
-	RemoteCmd.Flags().IntVar(&chunkSize, "chunk-size", 2<<10, "chunk size")
-	RemoteCmd.Flags().BoolP("enable-snappy", "z", false, "enable snappy")
+func NewRemote(serverPort int, key string, chunkSize int, enableSnappy bool) *Remote {
+	conf := &socks5.Config{}
+	s5, err := socks5.New(conf)
+	if err != nil {
+		panic(err)
+	}
 
-	viper.BindPFlag("listen-port", RemoteCmd.Flags().Lookup("listen-socks5"))
-	viper.BindPFlag("key", RemoteCmd.Flags().Lookup("key"))
-	viper.BindPFlag("chunk-size", RemoteCmd.Flags().Lookup("chunk-size"))
-	viper.BindPFlag("enable-snappy", RemoteCmd.Flags().Lookup("enable-snappy"))
+	if len(key) == 0 {
+		log.Warn("key is empty")
+	}
+
+	return &Remote{
+		serverPort:   serverPort,
+		key:          key,
+		enableSnappy: enableSnappy,
+		chunkSize:    chunkSize,
+		s5RemoteServer: &s5RemoteServer{
+			Server: s5,
+		},
+	}
 }
 
-func run(cmd *cobra.Command, args []string) {
-	flag.Parse()
-
-	serveAddr := fmt.Sprintf("0.0.0.0:%d", listenPort)
+func (r *Remote) MainLoop() {
+	serveAddr := fmt.Sprintf(":%d", r.serverPort)
 	l, err := net.Listen("tcp", serveAddr)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Printf("remote server is serving on %s, key: %s \n", serveAddr, key)
-	fmt.Printf("You can run falcon with the following arguments in your local device: \n ./falcon local -k %s -r [Remote Server IP]:%d -chunk %d \n", key, listenPort, chunkSize)
-	block, err := aes.NewCipher(common.Sha3Sum256([]byte(key)))
+	log.Infof("remote server is serving on %s, key: %s \n", serveAddr, r.key)
+	log.Infof("You can run falcon with the following arguments in your local device: \n ./falcon local -k %s -r [Remote_Server_IP]:%d -chunk %d \n", r.key, r.serverPort, r.chunkSize)
+	block, err := aes.NewCipher(common.Sha3Sum256([]byte(r.key)))
 	if err != nil {
 		panic(err)
 	}
@@ -58,16 +64,28 @@ func run(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
-	remote := remote.NewRemote(chunkSize, enableSnappy)
-
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			log.Println(err)
+			log.Errorf("failed accept the conn from client: %s", err)
 			continue
 		}
 
-		log.Printf("accepted conn from %s", conn.RemoteAddr())
-		go remote.HandleConn(conn, aead)
+		log.Infof("accepted conn from %s", conn.RemoteAddr())
+		go r.HandleConn(conn, aead)
+	}
+}
+
+func (r *Remote) HandleConn(conn net.Conn, aead cipher.AEAD) {
+	var cryptoConn net.Conn
+	if r.enableSnappy {
+		cryptoConn = aeadconn.NewAEADCompressConn(common.GetSeed([]byte(r.key)), r.chunkSize, conn, aead)
+	} else {
+		cryptoConn = aeadconn.NewAEADConn(common.GetSeed([]byte(r.key)), r.chunkSize, conn, aead)
+	}
+
+	err := r.serverConn(cryptoConn)
+	if err != nil {
+		log.Error(err)
 	}
 }

@@ -5,3 +5,5 @@ bin/
 
 # contains personal debug config
 .vscode/launch.json 
+config.yaml
+.idea/

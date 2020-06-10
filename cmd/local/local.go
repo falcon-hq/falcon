@@ -3,58 +3,61 @@ package localcmd
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"log"
+	"fmt"
+	"github.com/maoxs2/falcon/auth"
+	"github.com/spf13/viper"
+	"io"
 	"net"
 
+	logging "github.com/ipfs/go-log"
 	"github.com/maoxs2/falcon/common"
-	"github.com/maoxs2/falcon/local"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	aeadconn "github.com/maoxs2/go-aead-conn"
 )
 
-var localSocks5Addr string
-var remoteAddr string
-var key string
-var chunkSize int
-var authUser string
-var authPass string
-var enableSnappy bool
+var log = logging.Logger("falcon-local")
 
-var LocalCmd = &cobra.Command{
-	Use:   "local",
-	Short: "Client daemon for local device",
-	Run:   run,
+type Local struct {
+	socks5Addr   string
+	enableSnappy bool
+	remoteAddr   string
+	chunkSize    int
+	authMan      *auth.Authenticator
+	key          string
 }
 
-func init() {
-	LocalCmd.Flags().StringVarP(&localSocks5Addr, "listen-socks5", "l", "127.0.0.1:10008", "Source directory to read from")
-	LocalCmd.Flags().StringVarP(&remoteAddr, "remote-addr", "r", "", "remote addr")
-	LocalCmd.Flags().StringVarP(&key, "key", "k", "", "key for data encryption")
-	LocalCmd.Flags().IntVar(&chunkSize, "chunk-size", 2<<10, "chunk size")
-	LocalCmd.Flags().StringVarP(&authUser, "auth-username", "u", "", "username value for socks authorization")
-	LocalCmd.Flags().StringVarP(&authPass, "auth-password", "p", "", "password value for socks authorization")
-	LocalCmd.Flags().BoolP("enable-snappy", "z", false, "enable snappy")
+func NewLocal(socks5Addr, remoteAddr, key string, chunkSize int, authUser, authPass string, enableSnappy bool) *Local {
+	var authMan *auth.Authenticator
+	if len(authUser) != 0 {
+		authMan = auth.NewAuthenticator(map[string]string{
+			authUser: authPass,
+		})
+	} else {
+		authMan = auth.NewAuthenticator(nil)
+	}
 
-	LocalCmd.MarkFlagRequired("remote-addr")
+	if len(key) == 0 {
+		log.Warn("key is empty")
+	}
 
-	viper.BindPFlag("listen-socks5", LocalCmd.Flags().Lookup("listen-socks5"))
-	viper.BindPFlag("remote-addr", LocalCmd.Flags().Lookup("remote-addr"))
-	viper.BindPFlag("key", LocalCmd.Flags().Lookup("key"))
-	viper.BindPFlag("chunk-size", LocalCmd.Flags().Lookup("chunk-size"))
-	viper.BindPFlag("auth-username", LocalCmd.Flags().Lookup("auth-username"))
-	viper.BindPFlag("auth-password", LocalCmd.Flags().Lookup("auth-password"))
-	viper.BindPFlag("enable-snappy", LocalCmd.Flags().Lookup("enable-snappy"))
+	return &Local{
+		socks5Addr:   socks5Addr,
+		enableSnappy: enableSnappy,
+		remoteAddr:   remoteAddr,
+		key:          key,
+		chunkSize:    chunkSize,
+		authMan:      authMan,
+	}
 }
 
-func run(cmd *cobra.Command, args []string) {
-	l, err := net.Listen("tcp", localSocks5Addr)
+func (l *Local) MainLoop() {
+	listener, err := net.Listen("tcp", l.socks5Addr)
 	if err != nil {
 		panic(err)
 	}
 
-	log.Printf("serving on local: %s", localSocks5Addr)
-	log.Printf("connect to %s with key %s", remoteAddr, key)
-	block, err := aes.NewCipher(common.Sha3Sum256([]byte(key)))
+	log.Infof("serving on local: %s \n", l.socks5Addr)
+	log.Infof("local connects with remote %s with key %s \n", l.remoteAddr, l.key)
+	block, err := aes.NewCipher(common.Sha3Sum256([]byte(viper.GetString("key"))))
 	if err != nil {
 		panic(err)
 	}
@@ -64,26 +67,90 @@ func run(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
-	local := local.NewLocal(remoteAddr, chunkSize, authUser, authPass, enableSnappy)
+	for {
+		localConn, err := listener.Accept()
+		if err != nil {
+			log.Errorf("failed to accept local conn: %s", err)
+			continue
+		}
 
+		version := []byte{0}
+		if _, err := localConn.Read(version); err != nil {
+			log.Errorf("socks: Failed to get version byte: %v", err)
+		}
+
+		if version[0] != 0x05 {
+			err := fmt.Errorf("unsupported socks version: %v", version)
+			log.Errorf("socks version error: %v", err)
+		}
+
+		if err := l.authMan.Auth(localConn, localConn); err != nil {
+			log.Errorf("auth failed: %v", err)
+			continue
+		}
+
+		log.Info("new app conn")
+		go l.HandleConn(localConn, aead)
+	}
+}
+
+func (l *Local) HandleConn(lc net.Conn, aead cipher.AEAD) {
+	externalConn, err := net.Dial("tcp", l.remoteAddr)
+	if err != nil {
+		log.Errorf("failed connecting to remote server: %s: %s", l.remoteAddr, err)
+		return
+	}
+
+	var cryptoConn net.Conn
+	if l.enableSnappy {
+		cryptoConn = aeadconn.NewAEADCompressConn(common.GetSeed([]byte(l.key)), l.chunkSize, externalConn, aead)
+	} else {
+		cryptoConn = aeadconn.NewAEADConn(common.GetSeed([]byte(l.key)), l.chunkSize, externalConn, aead)
+	}
+
+	// lc -> sc
 	go func() {
+		buf := make([]byte, l.chunkSize)
 		for {
-			localConn, err := l.Accept()
+			n, err := lc.Read(buf)
+			if err == io.EOF {
+				externalConn.(*net.TCPConn).CloseWrite() // todo
+				break
+			}
 			if err != nil {
-				log.Println(err)
+				log.Errorf("outgoing error: %v", err)
+				break
+			}
+
+			if n == 0 {
 				continue
 			}
 
-			if err := local.HandleAuth(localConn); err != nil {
-				log.Println(err)
-			}
-
-			log.Println("New App Conn")
-			go local.HandleConn(localConn, aead)
+			log.Debugf("sending: %x", buf[:n])
+			cryptoConn.Write(buf[:n])
 		}
 	}()
 
-	for {
-		select {}
-	}
+	// sc -> lc
+	go func() {
+		buf := make([]byte, l.chunkSize)
+		for {
+			n, err := cryptoConn.Read(buf)
+			if err == io.EOF {
+				lc.(*net.TCPConn).CloseWrite()
+				break
+			}
+			if err != nil {
+				log.Errorf("incoming error: %v", err)
+				break
+			}
+
+			if n == 0 {
+				continue
+			}
+
+			log.Debugf("recving: %x", buf[:n])
+			lc.Write(buf[:n])
+		}
+	}()
 }

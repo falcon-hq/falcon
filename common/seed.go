@@ -6,8 +6,11 @@ import (
 )
 
 // GetSeed returns a time-interval-guranteed seed based on the timestamp
-func GetSeed() []byte {
-	return Sha3Sum256(packInt64(getTimestampAboutMinute()))
+func GetSeed(salt []byte) []byte {
+	ts := packInt64(getTimestampAboutMinute())
+	tsAndHash := make([]byte, 0, 8+32)
+	tsAndHash = append(ts, Sha3Sum256(salt)...)
+	return Sha3Sum256(tsAndHash)
 }
 
 func getTimestampAboutMinute() int64 {

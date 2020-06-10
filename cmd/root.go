@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	remotecmd "github.com/maoxs2/falcon/cmd/remote"
+	"github.com/spf13/viper"
 	"os"
 
 	localcmd "github.com/maoxs2/falcon/cmd/local"
-	remotecmd "github.com/maoxs2/falcon/cmd/remote"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var cfgFile string
@@ -26,10 +26,9 @@ func Execute() error {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is config.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file, default is config.(yaml, json, toml)")
 
-	rootCmd.AddCommand(localcmd.LocalCmd)
-	rootCmd.AddCommand(remotecmd.RemoteCmd)
+	rootCmd.AddCommand(localcmd.LocalCmd, remotecmd.RemoteCmd)
 }
 
 func initConfig() {
@@ -43,7 +42,6 @@ func initConfig() {
 			fmt.Println("Error:", err)
 			os.Exit(1)
 		}
-
 		// Search config in home directory with name ".cobra" (without extension).
 		viper.AddConfigPath(home)
 		viper.SetConfigName("config")
