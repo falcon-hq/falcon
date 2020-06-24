@@ -1,6 +1,6 @@
 package main
 
-import "github.com/maoxs2/falcon/cmd"
+import "github.com/falcon-hq/falcon/cmd"
 
 func main() {
 	cmd.Execute()

@@ -4,10 +4,11 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"fmt"
-	logging "github.com/ipfs/go-log"
 	"net"
 
-	"github.com/maoxs2/falcon/common"
+	logging "github.com/ipfs/go-log"
+
+	"github.com/falcon-hq/falcon/common"
 	aeadconn "github.com/maoxs2/go-aead-conn"
 	"github.com/maoxs2/go-socks5"
 )

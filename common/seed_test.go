@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/maoxs2/falcon/common"
+	"github.com/falcon-hq/falcon/common"
 )
 
 func TestGetSeed(t *testing.T) {

@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	remotecmd "github.com/maoxs2/falcon/cmd/remote"
-	"github.com/spf13/viper"
 	"os"
 
-	localcmd "github.com/maoxs2/falcon/cmd/local"
+	remotecmd "github.com/falcon-hq/falcon/cmd/remote"
+	"github.com/spf13/viper"
+
+	localcmd "github.com/falcon-hq/falcon/cmd/local"
 	"github.com/spf13/cobra"
 )
 
