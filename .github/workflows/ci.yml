@@ -1,0 +1,39 @@
+name: CI
+on:
+  push:
+    branches: [master]
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build falcon-go
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+        - build: x86_64-linux
+          os: ubuntu-latest
+        - build: x86_64-macos
+          os: macos-latest
+        - build: x86_64-windows
+          os: windows-latest
+          target: x86_64-pc-windows-gnu
+        - build: aarch64-linux
+          os: ubuntu-latest
+          target: aarch64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '^1.18'
+
+      - name: Go Vet
+        run: go vet -v ./...
+
+      - name: Go Test
+        run: go test -timeout 2min -v ./...
+
+      - name: Go Test with race
+        run: go test -timeout 2min -race -v ./...
